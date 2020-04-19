@@ -1,0 +1,105 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "bloggy.fullname" . }}
+  labels:
+    {{- include "bloggy.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "bloggy.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "bloggy.selectorLabels" . | nindent 8 }}
+    spec:
+    {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+      serviceAccountName: {{ include "bloggy.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: database__connection__user
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "bloggy.fullname" . }}-mysql
+                  key: username
+            - name: database__connection__password
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "bloggy.fullname" . }}-mysql
+                  key: password
+            - name: database__client
+              value: mysql
+            - name: database__connection__host
+              value: {{ .Values.database.host }}
+            - name: database__connection__database
+              value: {{ .Values.database.database }}
+            - name: server__host
+              value: '0.0.0.0'
+            - name: server__port
+              value: '8080'
+            - name: logging__transports
+              value: '["stdout"]'
+            - name: url
+              value: {{ .Values.blog.url | quote }}
+            - name: mail__transport
+              value: 'SMTP'
+            - name: mail__options__service
+              value: 'SES'
+            - name: mail__options__host
+              value: 'email-smtp.us-east-1.amazonaws.com'
+            - name: mail__options__port
+              value: '465'
+            - name: mail__options__auth__user
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "bloggy.fullname" . }}-ses
+                  key: username
+            - name: mail__options__auth__pass
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "bloggy.fullname" . }}-ses
+                  key: password
+            - name: mail__from
+              value: {{ .Values.blog.mail_from | quote }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          livenessProbe:
+            tcpSocket:
+              port: http
+          readinessProbe:
+            tcpSocket:
+              port: http
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - mountPath: /var/lib/ghost/content
+              name: content
+      volumes:
+        - name: content
+          persistentVolumeClaim:
+            claimName: {{ include "bloggy.fullname" . }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+    {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
