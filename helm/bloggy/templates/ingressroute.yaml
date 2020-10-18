@@ -1,4 +1,4 @@
-{{- if .Values.ingress.enabled -}}
+{{- if .Values.ingressRoute.enabled -}}
 {{- $fullName := include "bloggy.fullname" . -}}
 {{- $svcPort := .Values.service.port -}}
 apiVersion: traefik.containo.us/v1alpha1
@@ -7,7 +7,7 @@ metadata:
   name: {{ $fullName }}
   labels:
     {{- include "bloggy.labels" . | nindent 4 }}
-  {{- with .Values.ingress.annotations }}
+  {{- with .Values.ingressRoute.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
@@ -15,13 +15,17 @@ spec:
   entryPoints:
   - web
   routes:
-  {{- range .Values.ingress.hosts }}
+  {{- range .Values.ingressRoute.hosts }}
   - match: Host(`{{ .host }}`)
     kind: Rule
+    middlewares:
+    - name: redirect-https
+      namespace: traefik
     services:
     - name: {{ $fullName }}
       port: {{ $svcPort }}
   {{- end }}
+{{- if .Values.ingressRoute.tls }}
 ---
 apiVersion: traefik.containo.us/v1alpha1
 kind: IngressRoute
@@ -29,7 +33,7 @@ metadata:
   name: {{ $fullName }}-tls
   labels:
     {{- include "bloggy.labels" . | nindent 4 }}
-  {{- with .Values.ingress.annotations }}
+  {{- with .Values.ingressRoute.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
@@ -37,7 +41,7 @@ spec:
   entryPoints:
   - websecure
   routes:
-  {{- range .Values.ingress.hosts }}
+  {{- range .Values.ingressRoute.hosts }}
   - match: Host(`{{ .host }}`)
     kind: Rule
     services:
@@ -45,5 +49,8 @@ spec:
       port: {{ $svcPort }}
   {{- end }}
   tls:
-    certResolver: default
+    {{- if .Values.ingressRoute.tls.secretName }}
+    secretName: {{ .Values.ingressRoute.tls.secretName }}
+    {{- end }}
+{{- end }}
 {{- end }}

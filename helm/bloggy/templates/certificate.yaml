@@ -1,0 +1,19 @@
+{{- if .Values.certificate.enabled -}}
+{{- $fullName := include "bloggy.fullname" . -}}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ $fullName }}-certificate
+  labels:
+    {{- include "bloggy.labels" . | nindent 4 }}
+spec:
+  secretName: {{ $fullName }}-tls
+  issuerRef:
+    kind: {{ .Values.certificate.issuerRef.kind }}
+    name: {{ .Values.certificate.issuerRef.name }}
+  commonName: {{ first .Values.certificate.hosts | quote }}
+  dnsNames:
+{{- range .Values.certificate.hosts }}
+  - {{ . | quote }}
+{{- end }}
+{{- end }}
